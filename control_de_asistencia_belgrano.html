@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club Atlético Belgrano - Control de Asistencia</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        belgrano: {
+                            light: '#38c0f4',
+                            DEFAULT: '#00a3e0',
+                            dark: '#0087ba',
+                            sky: '#e0f2fe'
+                        },
+                        pirata: {
+                            black: '#000000',
+                            dark: '#111827',
+                            gray: '#1f2937'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF & autoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col text-slate-800">
+
+    <!-- Header Institucional Belgrano (Celeste, Negro y Blanco) -->
+    <header class="bg-belgrano text-white shadow-md sticky top-0 z-50 border-b-4 border-pirata-black">
+        <div class="max-w-7xl mx-auto px-4 py-3.5 flex justify-between items-center">
+            <div>
+                <h1 class="font-black text-2xl tracking-tight leading-tight text-white uppercase">Club Atlético Belgrano</h1>
+                <p class="text-xs text-black font-extrabold uppercase tracking-widest">Sistema de Control de Asistencia</p>
+            </div>
+            
+            <div id="visitorBadge" class="hidden bg-pirata-black text-belgrano text-xs font-bold px-3 py-1.5 rounded-full flex items-center space-x-1.5 shadow border border-belgrano">
+                <i class="fa-solid fa-eye"></i>
+                <span>Modo Lectura (Visitante)</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="max-w-7xl mx-auto w-full p-4 md:p-6 flex-1">
+        
+        <!-- Barra de Filtros y Selección Global -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-pirata-gray uppercase mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-location-dot text-belgrano"></i> Sede
+                    </label>
+                    <select id="filterSede" onchange="renderApp()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-belgrano focus:outline-none">
+                        <!-- Carga dinámica -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-pirata-gray uppercase mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-people-group text-belgrano"></i> Categoría
+                    </label>
+                    <select id="filterCategoria" onchange="renderApp()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-belgrano focus:outline-none">
+                        <!-- Carga dinámica -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-pirata-gray uppercase mb-1 flex items-center gap-1.5">
+                        <i class="fa-regular fa-calendar text-belgrano"></i> Fecha de Sesión
+                    </label>
+                    <input type="date" id="filterFecha" onchange="renderApp()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-belgrano focus:outline-none">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="shareVisitorLink()" class="w-full bg-pirata-black hover:bg-pirata-dark text-white font-bold py-2.5 px-4 rounded-xl text-sm flex items-center justify-center space-x-2 transition shadow-sm border border-slate-800">
+                        <i class="fa-solid fa-share-nodes text-belgrano"></i>
+                        <span>Compartir Enlace</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pestañas de Navegación -->
+        <div class="flex border-b border-slate-200 mb-6 space-x-2 overflow-x-auto">
+            <button id="tabBtnAsistencia" onclick="switchTab('asistencia')" class="py-3 px-5 font-bold text-sm border-b-2 border-belgrano text-belgrano flex items-center space-x-2 whitespace-nowrap transition">
+                <i class="fa-solid fa-clipboard-user"></i>
+                <span>Tomar Asistencia</span>
+            </button>
+            <button id="tabBtnHistorial" onclick="switchTab('historial')" class="py-3 px-5 font-bold text-sm border-b-2 border-transparent text-slate-500 hover:text-pirata-black flex items-center space-x-2 whitespace-nowrap transition">
+                <i class="fa-solid fa-clock-rotate-left text-belgrano"></i>
+                <span>Historial de Fechas</span>
+            </button>
+            <button id="tabBtnPdf" onclick="switchTab('pdf')" class="py-3 px-5 font-bold text-sm border-b-2 border-transparent text-slate-500 hover:text-pirata-black flex items-center space-x-2 whitespace-nowrap transition">
+                <i class="fa-solid fa-file-pdf text-rose-600"></i>
+                <span>Reporte PDF Mensual</span>
+            </button>
+            <button id="tabBtnAlertas" onclick="switchTab('alertas')" class="py-3 px-5 font-bold text-sm border-b-2 border-transparent text-slate-500 hover:text-pirata-black flex items-center space-x-2 whitespace-nowrap transition">
+                <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+                <span>Alertas</span>
+                <span id="badgeAlertas" class="bg-pirata-black text-white text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+            </button>
+            <button id="tabBtnConfig" onclick="switchTab('config')" class="py-3 px-5 font-bold text-sm border-b-2 border-transparent text-slate-500 hover:text-pirata-black flex items-center space-x-2 whitespace-nowrap transition">
+                <i class="fa-solid fa-gear"></i>
+                <span>Config. Sedes / Categorías</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: TOMAR ASISTENCIA -->
+        <div id="tabAsistencia" class="space-y-6">
+            
+            <!-- Barra de Acciones Rápidas -->
+            <div class="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Sede & Categoría Activa</span>
+                    <span id="lblCurrentFilter" class="font-extrabold text-pirata-black text-base">Sede - Categ.</span>
+                </div>
+                
+                <div id="adminActions" class="flex flex-wrap items-center gap-2">
+                    <button onclick="marcarTodos('presente')" class="admin-only bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center space-x-1.5 transition shadow-sm">
+                        <i class="fa-solid fa-check-double"></i>
+                        <span>Todos Presentes</span>
+                    </button>
+                    <button onclick="marcarTodos('ausente')" class="admin-only bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center space-x-1.5 transition shadow-sm">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span>Todos Ausentes</span>
+                    </button>
+                    <button onclick="openAddPlayerModal()" class="admin-only bg-belgrano hover:bg-belgrano-dark text-pirata-black font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center space-x-1.5 transition shadow-sm">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>Agregar Jugador</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabla de Jugadores para Asistencia -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-pirata-black text-white text-xs font-extrabold uppercase tracking-wider border-b border-slate-800">
+                                <th class="p-4">Jugador (Nombre y Apellido)</th>
+                                <th class="p-4 text-center">Asistencia del Día</th>
+                                <th class="p-4 text-center">Faltas Totales</th>
+                                <th class="p-4 text-right pr-6 admin-only">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="playersTableBody" class="divide-y divide-slate-100 text-sm">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="emptyPlayersState" class="hidden p-10 text-center text-slate-500">
+                    <i class="fa-regular fa-folder-open text-4xl mb-3 text-slate-300"></i>
+                    <p class="font-bold text-slate-700">No hay jugadores registrados en esta Sede y Categoría.</p>
+                    <p class="text-xs text-slate-400 mt-1">Utiliza el botón "Agregar Jugador" para dar de alta nuevos integrantes.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: HISTORIAL DE FECHAS -->
+        <div id="tabHistorial" class="hidden space-y-6">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h3 class="font-extrabold text-pirata-black text-base flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-days text-belgrano"></i>
+                        <span>Sesiones de Asistencia Registradas</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Histórico grabado fecha por fecha para la sede y categoría seleccionadas.</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-pirata-black text-white text-xs font-extrabold uppercase tracking-wider border-b border-slate-800">
+                                <th class="p-4">Fecha de Práctica / Partido</th>
+                                <th class="p-4 text-center">Presentes</th>
+                                <th class="p-4 text-center">Ausentes</th>
+                                <th class="p-4 text-center">% Asistencia</th>
+                                <th class="p-4 text-right pr-6">Cargar / Editar Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-slate-100 text-sm">
+                            <!-- Fechas grabadas -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="emptyHistoryState" class="hidden p-10 text-center text-slate-500">
+                    <i class="fa-solid fa-calendar-xmark text-4xl mb-3 text-slate-300"></i>
+                    <p class="font-bold text-slate-700">No hay clases o fechas registradas para este filtro.</p>
+                    <p class="text-xs text-slate-400 mt-1">Toma la asistencia de un día en la pestaña principal para guardarla aquí.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: REPORTE PDF MENSUAL -->
+        <div id="tabPdf" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+                    <i class="fa-solid fa-file-pdf text-rose-600 text-xl"></i>
+                    <div>
+                        <h3 class="font-extrabold text-pirata-black text-base">Exportar Matriz Mensual de Asistencia</h3>
+                        <p class="text-xs text-slate-500">Genera una tabla en PDF con la asistencia día por día de todos los jugadores durante el mes seleccionado.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Año</label>
+                        <select id="pdfYear" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-belgrano focus:outline-none">
+                            <option value="2026" selected>2026</option>
+                            <option value="2025">2025</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Mes</label>
+                        <select id="pdfMonth" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-belgrano focus:outline-none">
+                            <option value="01">Enero</option>
+                            <option value="02">Febrero</option>
+                            <option value="03">Marzo</option>
+                            <option value="04">Abril</option>
+                            <option value="05">Mayo</option>
+                            <option value="06">Junio</option>
+                            <option value="07">Julio</option>
+                            <option value="08">Agosto</option>
+                            <option value="09">Septiembre</option>
+                            <option value="10" selected>Octubre</option>
+                            <option value="11">Noviembre</option>
+                            <option value="12">Diciembre</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="exportMonthlyPDF()" class="w-full bg-pirata-black hover:bg-pirata-dark text-white font-extrabold py-2.5 px-4 rounded-xl text-sm flex items-center justify-center space-x-2 transition shadow-sm border border-slate-800">
+                            <i class="fa-solid fa-download text-belgrano"></i>
+                            <span>Descargar Matriz PDF</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: ALERTAS -->
+        <div id="tabAlertas" class="hidden space-y-4">
+            <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-2xl shadow-sm">
+                <div class="flex items-center">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-600 text-xl mr-3"></i>
+                    <div>
+                        <h3 class="text-amber-900 font-bold text-sm">Seguimiento de Ausentismo (3 o más Inasistencias)</h3>
+                        <p class="text-xs text-amber-700 mt-0.5">Listado automático de jugadores con 3 o más faltas en el historial general.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-pirata-black text-white text-xs font-extrabold uppercase tracking-wider border-b border-slate-800">
+                                <th class="p-4">Jugador</th>
+                                <th class="p-4">Sede / Categoría</th>
+                                <th class="p-4 text-center">Total Faltas</th>
+                                <th class="p-4 text-right pr-6">Contacto WhatsApp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertsTableBody" class="divide-y divide-slate-100 text-sm">
+                            <!-- Filas de Alertas -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="emptyAlertsState" class="hidden p-10 text-center text-slate-500">
+                    <i class="fa-solid fa-circle-check text-4xl mb-3 text-emerald-500"></i>
+                    <p class="font-bold text-slate-700">Sin alertas por ausentismo</p>
+                    <p class="text-xs text-slate-400 mt-1">Todos los jugadores cumplen con el nivel óptimo de asistencia.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: CONFIGURACIÓN (SEDES Y CATEGORÍAS) -->
+        <div id="tabConfig" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- Gestor de Sedes -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+                        <i class="fa-solid fa-building-columns text-belgrano text-lg"></i>
+                        <h3 class="font-extrabold text-pirata-black">Gestión de Sedes</h3>
+                    </div>
+                    
+                    <div id="adminConfigSedes" class="admin-only flex space-x-2">
+                        <input type="text" id="inputNewSede" placeholder="Ej: Sede Villa Esquiú" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-belgrano focus:outline-none">
+                        <button onclick="addSede()" class="bg-belgrano hover:bg-belgrano-dark text-pirata-black font-extrabold px-4 py-2.5 rounded-xl text-sm flex items-center space-x-1 transition shadow-sm">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Agregar</span>
+                        </button>
+                    </div>
+
+                    <ul id="listSedes" class="divide-y divide-slate-100 max-h-60 overflow-y-auto">
+                        <!-- Lista dinámica de sedes -->
+                    </ul>
+                </div>
+
+                <!-- Gestor de Categorías -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+                        <i class="fa-solid fa-layer-group text-belgrano text-lg"></i>
+                        <h3 class="font-extrabold text-pirata-black">Gestión de Categorías</h3>
+                    </div>
+                    
+                    <div id="adminConfigCategorias" class="admin-only flex space-x-2">
+                        <input type="text" id="inputNewCategoria" placeholder="Ej: 2014/2015" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-belgrano focus:outline-none">
+                        <button onclick="addCategoria()" class="bg-belgrano hover:bg-belgrano-dark text-pirata-black font-extrabold px-4 py-2.5 rounded-xl text-sm flex items-center space-x-1 transition shadow-sm">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Agregar</span>
+                        </button>
+                    </div>
+
+                    <ul id="listCategorias" class="divide-y divide-slate-100 max-h-60 overflow-y-auto">
+                        <!-- Lista dinámica de categorías -->
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal Agregar Jugador (Solo Nombre y Apellido) -->
+    <div id="modalAddPlayer" class="fixed inset-0 bg-pirata-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="font-extrabold text-pirata-black text-lg flex items-center space-x-2">
+                    <i class="fa-solid fa-user-plus text-belgrano"></i>
+                    <span>Agregar Nuevo Jugador</span>
+                </h3>
+                <button onclick="closeAddPlayerModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="formAddPlayer" onsubmit="handleAddPlayer(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre y Apellido</label>
+                    <input type="text" id="inputPlayerName" required placeholder="Ej: Lucas Passerini" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-belgrano focus:outline-none">
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeAddPlayerModal()" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-sm bg-belgrano hover:bg-belgrano-dark text-pirata-black font-extrabold shadow-sm">Guardar Jugador</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <script>
+        // Configuración de Datos Base Requeridos
+        const DEFAULT_SEDES = [
+            "Sede Predio Social",
+            "Sede Poeta Lugones"
+        ];
+
+        const DEFAULT_CATEGORIAS = [
+            "2020/2021",
+            "2018/2019",
+            "2012/2013"
+        ];
+
+        const DEFAULT_PLAYERS = [
+            { id: 1, name: "Lucas Beltrán", sede: "Sede Predio Social", categoria: "2020/2021", attendance: {} },
+            { id: 2, name: "Mateo Suárez", sede: "Sede Predio Social", categoria: "2020/2021", attendance: {} },
+            { id: 3, name: "Santiago Romero", sede: "Sede Poeta Lugones", categoria: "2018/2019", attendance: {} }
+        ];
+
+        // Estado Global
+        let appData = {
+            sedes: [],
+            categorias: [],
+            players: []
+        };
+        let isVisitorMode = false;
+
+        // Inicialización
+        window.onload = function() {
+            checkVisitorMode();
+            loadLocalStorage();
+            setDefaultDate();
+            populateSelects();
+            renderApp();
+        };
+
+        function checkVisitorMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            isVisitorMode = urlParams.get('mode') === 'visitor';
+
+            if (isVisitorMode) {
+                document.getElementById('visitorBadge').classList.remove('hidden');
+                document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+            }
+        }
+
+        function loadLocalStorage() {
+            const storedSedes = localStorage.getItem('cab_sedes');
+            const storedCategorias = localStorage.getItem('cab_categorias');
+            const storedPlayers = localStorage.getItem('cab_players');
+
+            appData.sedes = storedSedes ? JSON.parse(storedSedes) : [...DEFAULT_SEDES];
+            appData.categorias = storedCategorias ? JSON.parse(storedCategorias) : [...DEFAULT_CATEGORIAS];
+            appData.players = storedPlayers ? JSON.parse(storedPlayers) : [...DEFAULT_PLAYERS];
+        }
+
+        function saveData() {
+            localStorage.setItem('cab_sedes', JSON.stringify(appData.sedes));
+            localStorage.setItem('cab_categorias', JSON.stringify(appData.categorias));
+            localStorage.setItem('cab_players', JSON.stringify(appData.players));
+        }
+
+        function setDefaultDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('filterFecha').value = today;
+        }
+
+        function populateSelects() {
+            const selectSede = document.getElementById('filterSede');
+            const selectCategoria = document.getElementById('filterCategoria');
+            
+            const currentSede = selectSede.value;
+            const currentCategoria = selectCategoria.value;
+
+            selectSede.innerHTML = appData.sedes.map(s => `<option value="${s}">${s}</option>`).join('');
+            selectCategoria.innerHTML = appData.categorias.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            if (appData.sedes.includes(currentSede)) selectSede.value = currentSede;
+            if (appData.categorias.includes(currentCategoria)) selectCategoria.value = currentCategoria;
+        }
+
+        function switchTab(tabName) {
+            ['asistencia', 'historial', 'pdf', 'alertas', 'config'].forEach(t => {
+                const tabEl = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                const btnEl = document.getElementById(`tabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                if (t === tabName) {
+                    tabEl.classList.remove('hidden');
+                    btnEl.classList.add('border-belgrano', 'text-belgrano');
+                    btnEl.classList.remove('border-transparent', 'text-slate-500');
+                } else {
+                    tabEl.classList.add('hidden');
+                    btnEl.classList.remove('border-belgrano', 'text-belgrano');
+                    btnEl.classList.add('border-transparent', 'text-slate-500');
+                }
+            });
+        }
+
+        function renderApp() {
+            const selectedSede = document.getElementById('filterSede').value;
+            const selectedCategoria = document.getElementById('filterCategoria').value;
+            const selectedFecha = document.getElementById('filterFecha').value;
+
+            document.getElementById('lblCurrentFilter').innerText = `${selectedSede} — Categ. ${selectedCategoria}`;
+
+            // Renderizado Tabla de Jugadores
+            const tbody = document.getElementById('playersTableBody');
+            const emptyState = document.getElementById('emptyPlayersState');
+            tbody.innerHTML = '';
+
+            const filteredPlayers = appData.players.filter(p => p.sede === selectedSede && p.categoria === selectedCategoria);
+
+            if (filteredPlayers.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                filteredPlayers.forEach(player => {
+                    const status = player.attendance[selectedFecha] || 'sin_registrar';
+                    const totalAbsences = countAbsences(player);
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-sky-50/50 transition border-b border-slate-100';
+                    tr.innerHTML = `
+                        <td class="p-4 font-bold text-slate-800">${player.name}</td>
+                        <td class="p-4 text-center">
+                            <div class="inline-flex rounded-xl bg-slate-100 p-1 space-x-1">
+                                <button onclick="setAttendance(${player.id}, '${selectedFecha}', 'presente')" ${isVisitorMode ? 'disabled' : ''} class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition ${status === 'presente' ? 'bg-emerald-600 text-white shadow' : 'text-slate-600 hover:text-slate-900'}">
+                                    <i class="fa-solid fa-check mr-1"></i>Presente
+                                </button>
+                                <button onclick="setAttendance(${player.id}, '${selectedFecha}', 'ausente')" ${isVisitorMode ? 'disabled' : ''} class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition ${status === 'ausente' ? 'bg-rose-600 text-white shadow' : 'text-slate-600 hover:text-slate-900'}">
+                                    <i class="fa-solid fa-xmark mr-1"></i>Ausente
+                                </button>
+                            </div>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold ${totalAbsences >= 3 ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-slate-100 text-slate-700'}">
+                                ${totalAbsences} ${totalAbsences === 1 ? 'falta' : 'faltas'}
+                            </span>
+                        </td>
+                        <td class="p-4 text-right pr-6 admin-only ${isVisitorMode ? 'hidden' : ''}">
+                            <button onclick="deletePlayer(${player.id})" class="text-slate-400 hover:text-rose-600 p-1.5 transition" title="Eliminar Jugador">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            renderHistory();
+            renderAlerts();
+            renderConfigLists();
+        }
+
+        function countAbsences(player) {
+            return Object.values(player.attendance || {}).filter(val => val === 'ausente').length;
+        }
+
+        function setAttendance(playerId, date, status) {
+            if (isVisitorMode) return;
+            const player = appData.players.find(p => p.id === playerId);
+            if (player) {
+                if (!player.attendance) player.attendance = {};
+                player.attendance[date] = status;
+                saveData();
+                renderApp();
+            }
+        }
+
+        function marcarTodos(status) {
+            if (isVisitorMode) return;
+            const selectedSede = document.getElementById('filterSede').value;
+            const selectedCategoria = document.getElementById('filterCategoria').value;
+            const selectedFecha = document.getElementById('filterFecha').value;
+
+            const filteredPlayers = appData.players.filter(p => p.sede === selectedSede && p.categoria === selectedCategoria);
+            
+            filteredPlayers.forEach(p => {
+                if (!p.attendance) p.attendance = {};
+                p.attendance[selectedFecha] = status;
+            });
+
+            saveData();
+            renderApp();
+            showToast(`Todos los jugadores marcados como: ${status.toUpperCase()}`, 'success');
+        }
+
+        // Render del Historial por Fecha
+        function renderHistory() {
+            const historyTbody = document.getElementById('historyTableBody');
+            const emptyHistory = document.getElementById('emptyHistoryState');
+            historyTbody.innerHTML = '';
+
+            const selectedSede = document.getElementById('filterSede').value;
+            const selectedCategoria = document.getElementById('filterCategoria').value;
+
+            const filteredPlayers = appData.players.filter(p => p.sede === selectedSede && p.categoria === selectedCategoria);
+
+            // Obtener todas las fechas únicas registradas para este filtro
+            const datesSet = new Set();
+            filteredPlayers.forEach(p => {
+                Object.keys(p.attendance || {}).forEach(d => datesSet.add(d));
+            });
+
+            const sortedDates = Array.from(datesSet).sort().reverse();
+
+            if (sortedDates.length === 0) {
+                emptyHistory.classList.remove('hidden');
+            } else {
+                emptyHistory.classList.add('hidden');
+                sortedDates.forEach(dateStr => {
+                    let presentes = 0;
+                    let ausentes = 0;
+
+                    filteredPlayers.forEach(p => {
+                        const st = p.attendance[dateStr];
+                        if (st === 'presente') presentes++;
+                        else if (st === 'ausente') ausentes++;
+                    });
+
+                    const total = presentes + ausentes;
+                    const pct = total > 0 ? Math.round((presentes / total) * 100) : 0;
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+                    tr.innerHTML = `
+                        <td class="p-4 font-extrabold text-slate-800">${dateStr}</td>
+                        <td class="p-4 text-center font-bold text-emerald-600">${presentes}</td>
+                        <td class="p-4 text-center font-bold text-rose-600">${ausentes}</td>
+                        <td class="p-4 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-belgrano-sky text-belgrano-dark">
+                                ${pct}%
+                            </span>
+                        </td>
+                        <td class="p-4 text-right pr-6">
+                            <button onclick="loadDateForEdit('${dateStr}')" class="bg-pirata-black hover:bg-pirata-dark text-white text-xs font-bold px-3 py-1.5 rounded-lg transition shadow-sm">
+                                <i class="fa-solid fa-pen-to-square text-belgrano mr-1"></i> Ir a Fecha
+                            </button>
+                        </td>
+                    `;
+                    historyTbody.appendChild(tr);
+                });
+            }
+        }
+
+        function loadDateForEdit(dateStr) {
+            document.getElementById('filterFecha').value = dateStr;
+            switchTab('asistencia');
+            renderApp();
+            showToast(`Fecha ${dateStr} cargada en la vista principal`, 'info');
+        }
+
+        function renderAlerts() {
+            const alertsTbody = document.getElementById('alertsTableBody');
+            const emptyAlerts = document.getElementById('emptyAlertsState');
+            const badgeAlerts = document.getElementById('badgeAlertas');
+            alertsTbody.innerHTML = '';
+
+            const alertPlayers = appData.players.filter(p => countAbsences(p) >= 3);
+            badgeAlerts.innerText = alertPlayers.length;
+
+            if (alertPlayers.length === 0) {
+                emptyAlerts.classList.remove('hidden');
+            } else {
+                emptyAlerts.classList.add('hidden');
+                alertPlayers.forEach(p => {
+                    const totalFaltas = countAbsences(p);
+                    const whatsappMsg = encodeURIComponent(`Hola, nos comunicamos desde el Club Atlético Belgrano respecto a la asistencia del jugador ${p.name} (${p.sede} - Cat. ${p.categoria}), quien acumula ${totalFaltas} inasistencias.`);
+                    const waLink = `https://wa.me/?text=${whatsappMsg}`;
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+                    tr.innerHTML = `
+                        <td class="p-4 font-bold text-slate-800">${p.name}</td>
+                        <td class="p-4 text-xs text-slate-500">${p.sede}<br><span class="font-bold text-slate-700">Cat. ${p.categoria}</span></td>
+                        <td class="p-4 text-center">
+                            <span class="bg-rose-100 text-rose-800 font-extrabold px-3 py-1 rounded-full text-xs">
+                                ${totalFaltas} Faltas
+                            </span>
+                        </td>
+                        <td class="p-4 text-right pr-6">
+                            <a href="${waLink}" target="_blank" class="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition shadow-sm">
+                                <i class="fa-brands fa-whatsapp text-sm"></i>
+                                <span>Contactar</span>
+                            </a>
+                        </td>
+                    `;
+                    alertsTbody.appendChild(tr);
+                });
+            }
+        }
+
+        function renderConfigLists() {
+            // Lista de Sedes
+            const listSedes = document.getElementById('listSedes');
+            listSedes.innerHTML = appData.sedes.map(s => `
+                <li class="py-3 flex justify-between items-center text-sm border-b border-slate-100">
+                    <span class="font-bold text-slate-700">${s}</span>
+                    ${!isVisitorMode ? `
+                        <button onclick="removeSede('${s}')" class="text-slate-400 hover:text-rose-600 text-xs p-1">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    ` : ''}
+                </li>
+            `).join('');
+
+            // Lista de Categorías
+            const listCategorias = document.getElementById('listCategorias');
+            listCategorias.innerHTML = appData.categorias.map(c => `
+                <li class="py-3 flex justify-between items-center text-sm border-b border-slate-100">
+                    <span class="font-bold text-slate-700">Categoría ${c}</span>
+                    ${!isVisitorMode ? `
+                        <button onclick="removeCategoria('${c}')" class="text-slate-400 hover:text-rose-600 text-xs p-1">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    ` : ''}
+                </li>
+            `).join('');
+        }
+
+        // Gestión de Sedes y Categorías
+        function addSede() {
+            const input = document.getElementById('inputNewSede');
+            const val = input.value.trim();
+            if (!val) return;
+            if (appData.sedes.includes(val)) {
+                showToast('La sede ya existe', 'error');
+                return;
+            }
+            appData.sedes.push(val);
+            saveData();
+            populateSelects();
+            renderApp();
+            input.value = '';
+            showToast('Sede agregada', 'success');
+        }
+
+        function removeSede(sedeName) {
+            if (appData.sedes.length <= 1) {
+                showToast('Debe existir al menos una sede', 'error');
+                return;
+            }
+            appData.sedes = appData.sedes.filter(s => s !== sedeName);
+            saveData();
+            populateSelects();
+            renderApp();
+            showToast('Sede eliminada', 'info');
+        }
+
+        function addCategoria() {
+            const input = document.getElementById('inputNewCategoria');
+            const val = input.value.trim();
+            if (!val) return;
+            if (appData.categorias.includes(val)) {
+                showToast('La categoría ya existe', 'error');
+                return;
+            }
+            appData.categorias.push(val);
+            saveData();
+            populateSelects();
+            renderApp();
+            input.value = '';
+            showToast('Categoría agregada', 'success');
+        }
+
+        function removeCategoria(catName) {
+            if (appData.categorias.length <= 1) {
+                showToast('Debe existir al menos una categoría', 'error');
+                return;
+            }
+            appData.categorias = appData.categorias.filter(c => c !== catName);
+            saveData();
+            populateSelects();
+            renderApp();
+            showToast('Categoría eliminada', 'info');
+        }
+
+        // Modal y Jugadores
+        function openAddPlayerModal() {
+            document.getElementById('modalAddPlayer').classList.remove('hidden');
+        }
+
+        function closeAddPlayerModal() {
+            document.getElementById('modalAddPlayer').classList.add('hidden');
+            document.getElementById('formAddPlayer').reset();
+        }
+
+        function handleAddPlayer(e) {
+            e.preventDefault();
+            const name = document.getElementById('inputPlayerName').value.trim();
+            const sede = document.getElementById('filterSede').value;
+            const categoria = document.getElementById('filterCategoria').value;
+
+            if (!name) return;
+
+            const newPlayer = {
+                id: Date.now(),
+                name,
+                sede,
+                categoria,
+                attendance: {}
+            };
+
+            appData.players.push(newPlayer);
+            saveData();
+            closeAddPlayerModal();
+            renderApp();
+            showToast('Jugador registrado con éxito', 'success');
+        }
+
+        function deletePlayer(id) {
+            appData.players = appData.players.filter(p => p.id !== id);
+            saveData();
+            renderApp();
+            showToast('Jugador eliminado', 'info');
+        }
+
+        function shareVisitorLink() {
+            const baseUrl = window.location.href.split('?')[0];
+            const visitorUrl = `${baseUrl}?mode=visitor`;
+            
+            const tempInput = document.createElement('input');
+            tempInput.value = visitorUrl;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            showToast('¡Enlace de modo lectura copiado al portapapeles!', 'success');
+        }
+
+        // Exportación de PDF Mensual (Matriz de Asistencia del Mes)
+        function exportMonthlyPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+            const sede = document.getElementById('filterSede').value;
+            const categoria = document.getElementById('filterCategoria').value;
+            const year = document.getElementById('pdfYear').value;
+            const month = document.getElementById('pdfMonth').value;
+
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            const monthLabel = monthNames[parseInt(month, 10) - 1];
+
+            const filteredPlayers = appData.players.filter(p => p.sede === sede && p.categoria === categoria);
+
+            if (filteredPlayers.length === 0) {
+                showToast('No hay jugadores registrados en esta sede y categoría para exportar', 'error');
+                return;
+            }
+
+            // Filtrar todas las fechas correspondientes al Año-Mes seleccionado en las que hay registros
+            const monthPrefix = `${year}-${month}`;
+            const monthDatesSet = new Set();
+
+            filteredPlayers.forEach(p => {
+                Object.keys(p.attendance || {}).forEach(d => {
+                    if (d.startsWith(monthPrefix)) {
+                        monthDatesSet.add(d);
+                    }
+                });
+            });
+
+            const monthDates = Array.from(monthDatesSet).sort();
+
+            if (monthDates.length === 0) {
+                showToast(`No existen fechas de asistencia registradas para ${monthLabel} ${year}`, 'error');
+                return;
+            }
+
+            // Encabezado
+            doc.setFillColor(0, 163, 224); // Celeste
+            doc.rect(0, 0, 297, 22, 'F');
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text("CLUB ATLÉTICO BELGRANO - MATRIZ DE ASISTENCIA MENSUAL", 14, 14);
+
+            doc.setFontSize(10);
+            doc.setTextColor(40, 40, 40);
+            doc.text(`Sede: ${sede} | Categoría: ${categoria} | Período: ${monthLabel} ${year}`, 14, 28);
+
+            // Construcción de la Tabla
+            const headers = ['#', 'Jugador', ...monthDates.map(d => d.split('-')[2] + '/' + d.split('-')[1]), 'P', 'A', '% Asist.'];
+            
+            let totalGeneralPresentes = 0;
+            let totalGeneralPosibles = 0;
+
+            const body = filteredPlayers.map((p, idx) => {
+                let pCount = 0;
+                let aCount = 0;
+
+                const rowDates = monthDates.map(d => {
+                    const st = p.attendance[d];
+                    if (st === 'presente') {
+                        pCount++;
+                        return 'P';
+                    } else if (st === 'ausente') {
+                        aCount++;
+                        return 'A';
+                    }
+                    return '-';
+                });
+
+                totalGeneralPresentes += pCount;
+                totalGeneralPosibles += (pCount + aCount);
+
+                const totalAtt = pCount + aCount;
+                const pct = totalAtt > 0 ? Math.round((pCount / totalAtt) * 100) + '%' : '0%';
+
+                return [idx + 1, p.name, ...rowDates, pCount, aCount, pct];
+            });
+
+            doc.autoTable({
+                startY: 32,
+                head: [headers],
+                body: body,
+                headStyles: { fillStyle: 'F', fillColor: [0, 0, 0], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+                styles: { font: 'helvetica', fontSize: 8, halign: 'center' },
+                columnStyles: {
+                    0: { cellWidth: 10 },
+                    1: { halign: 'left', cellWidth: 45 }
+                },
+                alternateRowStyles: { fillColor: [240, 248, 255] }
+            });
+
+            doc.save(`Belgrano_Asistencia_${sede}_Cat_${categoria}_${monthLabel}_${year}.pdf`);
+            showToast('Matriz mensual PDF descargada con éxito', 'success');
+        }
+
+        // Sistema de Notificaciones Toast
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const bgClass = type === 'success' ? 'bg-emerald-600 text-white' : type === 'error' ? 'bg-rose-600 text-white' : 'bg-pirata-black text-white';
+
+            toast.className = `${bgClass} text-xs font-bold px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2 pointer-events-auto opacity-0 transition-opacity duration-300 border border-slate-700`;
+            toast.innerHTML = `
+                <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-info'} text-belgrano"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('opacity-0'), 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
